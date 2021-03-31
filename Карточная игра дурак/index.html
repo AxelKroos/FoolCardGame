@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Карточная игра "дурак"</title>
+    <link rel="stylesheet" type="text/css"   href="index.css">
+    <script src="https://npmcdn.com/react@15.3.0/dist/react.js"></script>
+    <script src="https://npmcdn.com/react-dom@15.3.0/dist/react-dom.js"></script>
+    <script src="https://npmcdn.com/babel-core@5.8.38/browser.min.js"></script>
+</head>
+<body>
+<div id="content"></div>
+<script type="text/babel">
+
+    class App extends React.Component
+    {
+        constructor(){
+            super();
+
+            this.state = {
+                //карты на руках у игрока
+                gamerCards : {'черви' :[],'буби' : [],'крести':[],'пики' : []},
+
+                //карты у компьютера
+                computerCards :{'черви' :[],'буби' : [],'крести':[],'пики' : []},
+
+                //карты в колоде
+                deck : {'черви' : ['6','7','8','9','10', 'валет', 'дама', 'король', 'туз'],
+                    'буби' : ['6','7','8','9','10', 'валет', 'дама', 'король', 'туз'],
+                    'крести' : ['6','7','8','9','10', 'валет', 'дама', 'король', 'туз'],
+                    'пики' : ['6','7','8','9','10', 'валет', 'дама', 'король', 'туз']
+                },
+
+                //козырь
+                trump : '',
+
+                //карта-козырь под колодой
+                trumpCard : '',
+
+                //карты на игровом поле
+                fieldCards : {'черви' :[],'буби' : [],'крести':[],'пики' : []},
+
+                //текущий атакующий игрок
+                currentGamer : '',
+
+                //текущая карта компьютера, которую нужно побить
+                currentComputerCard : {'lear': '', 'card' : ''},
+
+                info : 'info',
+
+                //флаг конца игры
+                gameOver : false,
+            };
+        }
+
+        componentDidMount() {
+
+            this.selectTrump();
+            this.give6Cards();
+            this.selectFirstGamer();
+
+            if(this.state.currentGamer == 'computer'){
+                this.setState({info : 'Компьютер ходит под вас'});
+                this.makeComputerMove();
+            }
+            else this.setState({info : 'Ваш ход'});
+        }
+
+        //начинает новую игру
+        startNewGame(){
+
+            this.state.gamerCards = {'черви' :[],'буби' : [],'крести':[],'пики' : []};
+            this.state.computerCards = {'черви' :[],'буби' : [],'крести':[],'пики' : []};
+            this.state.deck = {'черви' : ['6','7','8','9','10', 'валет', 'дама', 'король', 'туз'],
+                'буби' : ['6','7','8','9','10', 'валет', 'дама', 'король', 'туз'],
+                'крести' : ['6','7','8','9','10', 'валет', 'дама', 'король', 'туз'],
+                'пики' : ['6','7','8','9','10', 'валет', 'дама', 'король', 'туз']
+            };
+            this.state.currentComputerCard = {'lear': '', 'card' : ''};
+            this.state.fieldCards = {'черви' :[],'буби' : [],'крести':[],'пики' : []};
+            this.state.gameOver = false;
+            this.setState( {
+                gamerCards : this.state.gamerCards,
+                computerCards : this.state.gamerCards,
+                deck : this.state.deck,
+                fieldCards : this.state.fieldCards,
+                currentComputerCard : this.state.currentComputerCard,
+                gameOver : this.state.gameOver,
+            });
+            this.componentDidMount();
+            console.log('start', this.state.gamerCards);
+        }
+
+        randomInteger(min, max) {
+            let rand = min - 0.5 + Math.random() * (max - min + 1);
+            return Math.round(rand);
+        }
+
+        //функция случайно выбирает козырь
+        selectTrump(){
+            let trump = ['черви','буби','крести','пики'][this.randomInteger(0, 3)];
+            this.state.trump = trump;
+
+
+            let trumpCard = ['6','7','8','9','10', 'валет', 'дама', 'король', 'туз'][this.randomInteger(0, 8)];
+            this.state.trumpCard = trumpCard;
+
+            this.setState({trump : this.state.trump, trumpCard : this.state.trumpCard });
+
+            console.log('козыри',this.state.trump, this.state.trumpCard);
+        }
+
+        //функция выбирает, кто  ходит первым - игрок или компьютер
+        selectFirstGamer(){
+            let trump = this.state.trump;
+            let gamerIndex = -1;
+            let computerIndex = -1;
+
+            if(this.state.gamerCards[trump].length != 0){
+                let minGamerTrumpCard = this.selectMinCardWithLear(this.state.gamerCards[trump]);
+                gamerIndex = this.findIndex(minGamerTrumpCard);
+            }
+
+            if(this.state.computerCards[trump].length != 0){
+                let minComputerTrumpCard = this.selectMinCardWithLear(this.state.computerCards[trump]);
+                computerIndex = this.findIndex(minComputerTrumpCard);
+            }
+
+            if(gamerIndex == -1 && computerIndex == -1){
+                let gamer = this.randomInteger(0,1);
+                this.state.currentGamer = ['gamer', 'computer'][gamer];
+            }
+
+            else if(gamerIndex < computerIndex){
+                this.state.currentGamer = 'gamer';
+            }
+            else{
+                this.state.currentGamer = 'computer';
+            }
+            this.setState({currentGamer : this.state.currentGamer});
+            console.log(this.state.currentGamer);
+        }
+
+        //определяет победителя
+        isVictory(){
+
+            let emptyDeckFlag = true;
+            let emptyGamerCardsFlag = true;
+            let emptyComputerCardsFlag = true;
+
+            for(let lear in this.state.deck)
+            {
+                if(this.state.deck[lear].length != 0)
+                {
+                    emptyDeckFlag = false;
+                    break;
+                }
+            }
+
+            for(let lear in this.state.gamerCards)
+            {
+                if(this.state.gamerCards[lear].length != 0)
+                {
+                    emptyGamerCardsFlag = false;
+                    break;
+                }
+            }
+
+            for(let lear in this.state.computerCards)
+            {
+                if(this.state.computerCards[lear].length != 0)
+                {
+                    emptyComputerCardsFlag = false;
+                    break;
+                }
+            }
+
+            if(!emptyDeckFlag){
+                return false;
+            }
+            else if(emptyGamerCardsFlag){
+                this.state.info = 'Вы победили';
+                this.setState({gameOver : true});
+                return true;
+            }
+            else if(emptyComputerCardsFlag){
+                this.state.info = 'Вы проиграли';
+                this.setState({gameOver : true});
+                return true;
+            }
+        }
+
+
+        //функция удаляет определенную карту из колоды
+        deleteCardFromDeck(lear, cardNum){
+            this.state.deck[lear].splice(cardNum,1);
+            this.setState({deck : this.state.deck});
+        }
+
+        deleteCardFromGamer(lear, card){
+            let cardNum = this.state.gamerCards[lear].indexOf(card);
+            this.state.gamerCards[lear].splice(cardNum,1);
+            this.setState({gamerCards : this.state.gamerCards});
+        }
+
+        deleteCardFromComputer(lear, card){
+            let cardNum = this.state.computerCards[lear].indexOf(card);
+            this.state.computerCards[lear].splice(cardNum,1);
+            this.setState({computerCards : this.state.computerCards});
+        }
+
+        //функция выбирает из колоды 1 карту и удаляет её из колоды
+        getRandomCardFromDeck(){
+
+            let availableLears = []; //доступные масти в колоде (доступны те, в которых количество карт не равно 0)
+            for(let lear in this.state.deck){
+                if(this.state.deck[lear].length != 0){
+                    availableLears.push(lear);
+                }
+            }
+
+            //масти в колоде
+            //случайная масть из них
+
+            if(availableLears.length != 0){
+                let lear = availableLears[this.randomInteger(0, availableLears.length - 1)];
+                let cardsLength = this.state.deck[lear].length;
+                //cлучайный номер карты
+                let cardNum = this.randomInteger(0, cardsLength - 1);
+                let card = this.state.deck[lear][cardNum];
+                this.deleteCardFromDeck(lear, cardNum);
+                return {'lear': lear, 'card' : card};
+            }
+            else{
+                return false;
+            }
+        }
+
+        //раздаёт 6 карт в начале игры
+        give6Cards(){
+            for(let i = 0; i < 6; i++)
+            {
+                let randCard = this.getRandomCardFromDeck();
+                this.state.gamerCards[randCard.lear].push(randCard.card);
+                this.setState({gamerCards : this.state.gamerCards});
+
+                randCard = this.getRandomCardFromDeck();
+                this.state.computerCards[randCard.lear].push(randCard.card);
+                this.setState({computerCards : this.state.computerCards});
+            }
+
+            console.log('Карты игрока',this.state.gamerCards);
+            console.log('Карты компьютера',this.state.computerCards);
+            console.log('Колода',this.state.deck);
+        }
+
+        prepareToRender(stateObj){
+            let cards = [];
+            for(let lear in stateObj)
+            {
+                for(let card of stateObj[lear])
+                {
+                    cards.push([lear,card]);
+                }
+            }
+
+            cards = cards.map((elem, index) => {
+                let src = 'img/' + elem[1] + '_' + elem[0] + '.jpg';
+                return <div key = {index} className = 'card'>
+                    <img data-lear = {elem[0]}
+                         data-card = {elem[1]}
+                         onClick = {this.makeGamerMove.bind(this)}
+                         src = {src}
+                    />
+                </div>
+            });
+
+            return cards;
+        }
+
+        //добавляет карту в массив игрового поля
+        addCardToGameField(lear, card){
+            this.state.fieldCards[lear].push(card);
+            this.setState({fieldCards : this.state.fieldCards});
+        }
+
+        //Забрать все карты с игрового поля в карты игрока
+        // или компьютера(задаётся опцией gamer)
+
+        takeCardsFromGameField(gamer){
+
+            if(gamer == 'computer'){
+                for(let lear in this.state.fieldCards){
+                    for(let card of this.state.fieldCards[lear]){
+                        this.state.computerCards[lear].push(card);
+                    }
+                }
+            }
+
+            if(gamer == 'gamer'){
+                for(let lear in this.state.fieldCards){
+                    for(let card of this.state.fieldCards[lear]){
+                        this.state.gamerCards[lear].push(card);
+                    }
+                }
+            }
+
+            this.deleteCardsFromField();
+        }
+
+        //проверяет, есть ли карта, чтобы отбиться
+        findCardToMove(lear, card){
+            let cardsWithLear = this.state.computerCards[lear].length;
+            //Есть ли карта с заданной мастью?
+            if(cardsWithLear != 0){
+                console.log('Найдено карт с заданной мастью:', cardsWithLear);
+                //Есть ли карта с значением выше карты игрока?
+                let moreBiggerCard = this.findMoreBiggerCard(lear, card)['card'];
+                if(moreBiggerCard){
+                    this.addCardToGameField(lear, moreBiggerCard);
+                    this.deleteCardFromComputer(lear,moreBiggerCard);
+                }
+                //Если нет
+                else{
+                    this.noCardsWithLear(lear);
+                }
+            }
+            //Если нет
+            else{
+                this.noCardsWithLear(lear);
+            }
+        }
+
+        //функция возвращает количество карт
+        getLength(cards){
+            let length = 0;
+            for(let lear in cards){
+                length += cards[lear].length;
+            }
+            return length;
+        }
+
+        //функция реализует добор нужного количества карт из колоды после окончания хода
+        takeCardsFromDeck(){
+            console.log('takeCardsFromDeck');
+            let gamerCardsNum = this.getLength(this.state.gamerCards); //количество карт на руках у игрока
+
+            let value = 6 - +gamerCardsNum;
+            console.log('value', value);
+            if(value > 0){
+                if(this.getLength(this.state.deck)){
+                    for(let i = 0; i < value; i++){
+                        let randCard = this.getRandomCardFromDeck();
+                        if(randCard){
+                            console.log('добор', randCard);
+                            this.state.gamerCards[randCard.lear].push(randCard.card);
+                            this.setState({gamerCards : this.state.gamerCards});
+                        }
+                        else{
+                            console.log('карты закочились');
+                            break;
+                        }
+                    }
+                }
+            }
+
+            let computerCardsNum = this.getLength(this.state.computerCards); //количество карт на руках у компьютера
+
+            value = 6 - +computerCardsNum;
+            console.log('value', value);
+            if(value > 0){
+                if(this.getLength(this.state.deck)){
+                    for(let i = 0; i < value; i++){
+                        let randCard = this.getRandomCardFromDeck();
+                        this.state.computerCards[randCard.lear].push(randCard.card);
+                        this.setState({computerCards : this.state.computerCards});
+                    }
+                }
+            }
+        }
+
+        //находит индекс карты в массиве ['6','7','8','9','10', 'валет', 'дама', 'король', 'туз']
+        //используется для определения старшинства карт
+        findIndex(card){
+            let cards = ['6','7','8','9','10', 'валет', 'дама', 'король', 'туз'];
+            return cards.indexOf(card);
+        }
+
+        //обрабатывает ситуацию, когда у отбивающегося игрока нет карт с заданной мастью
+        noCardsWithLear(lear){
+            console.log('Карт с заданной мастью нет');
+            //Это козырь?
+            if(lear == this.state.trump){
+                console.log('Игрок ходил с козырей, компьютер забирает карты');
+                //Забрать все карты с игрового поля в карты компьютера
+                this.takeCardsFromGameField('computer');
+                this.takeCardsFromDeck();
+            }
+            //Если нет
+            else{
+                console.log('Игрок ходил не с козырей');
+                //Есть ли козыри?
+                let cardsTrump = this.state.computerCards[this.state.trump].length;
+                if(cardsTrump != 0){
+                    console.log('У компьютера есть козыри');
+                    console.log('Выбрана козырная карта',);
+                    let trump = this.state.trump;
+                    let card = this.selectMinCardWithLear(this.state.computerCards[trump])
+                    this.addCardToGameField(trump, card);
+                    this.deleteCardFromComputer(trump,card);
+                }
+                else{
+                    console.log('У компьютера нет козырей, он забирает карты');
+                    this.takeCardsFromGameField('computer');
+                    this.takeCardsFromDeck();
+                }
+            }
+        }
+
+        //сортирует карты компьютера по возрастанию
+        sortComputerCards(){
+            for(let lear in this.state.computerCards){
+                this.state.computerCards[lear].sort((card1, card2) => {
+                    return  this.findIndex(card1) - this.findIndex(card2);
+                });
+                this.setState({computerCards : this.state.computerCards});
+            }
+        }
+
+        //находит и возвращает минимальную карту заданной масти, которая бьёт карту противника или
+        //возвращает false, если такой карты нет
+        findMoreBiggerCard(lear, card){
+            let indexOfGamerCard = this.findIndex(card);
+            console.log('индекс карты игрока', indexOfGamerCard);
+
+            console.log('карты компьютера с данной мастью',this.state.computerCards[lear]);
+
+            this.sortComputerCards();
+
+            for(let compCard of this.state.computerCards[lear]){
+                let indexOfComputerCard = this.findIndex(compCard);
+                if(indexOfComputerCard > indexOfGamerCard){
+                    return {'lear': lear, 'card': compCard};
+                }
+            }
+            return false;
+        }
+
+        //выбирает минимальную карту с заданной мастью
+        selectMinCardWithLear(cards){
+            cards.sort((card1, card2) => {return this.findIndex(card1) - this.findIndex(card2)});
+            console.log('выбран минимальный козырь', cards[0]);
+            return cards[0];
+        }
+
+        //делает ход компьютера
+        makeComputerMove(lear, card){
+            //отсортируем карты компьютера по возрастанию
+            this.sortComputerCards();
+            //выбирает карту из карт компьютера, удаляет её из массива карт компьютера и добавляет
+            //на игровое поле
+
+            //если ход игрока (компьютер отбивается)
+            if(this.state.currentGamer == 'gamer')
+            {
+                this.findCardToMove(lear, card);
+            }
+
+            //если ход компьютера
+            else if(this.state.currentGamer == 'computer'){
+                let selectedCard;
+                if(this.getLength(this.state.fieldCards) == 0){
+
+                    let availableLears = []; //доступные масти не козыри
+                    for(let lear in this.state.computerCards){
+                        if( (this.state.computerCards[lear].length != 0) && lear != this.state.trump){
+                            availableLears.push(lear);
+                        }
+                    }
+                    //Если есть не козыри
+                    let minNotTrumpCards = [];
+                    if(availableLears.length != 0){
+
+                        //выбрать минимальную карту по значению
+                        for(let lear of availableLears){
+                            minNotTrumpCards.push({'lear':lear, 'card' : this.state.computerCards[lear][0]});
+                        }
+
+                        minNotTrumpCards.sort((card1, card2) => {
+                            return this.findIndex(card1['card']) - this.findIndex(card2['card']);
+                        });
+
+                        lear = minNotTrumpCards[0]['lear'];
+                        selectedCard = minNotTrumpCards[0]['card'];
+                        console.log('lear', lear, 'selectedCard', selectedCard);
+                    }
+                    //Если есть только козыри
+                    else{
+                        //то выбрать минимальный козырь
+                        lear = this.state.trump;
+                        selectedCard = this.state.computerCards[lear][0];
+                    }
+                }
+
+                    //Если на игровом поле уже есть карты и можно только подкидывать
+                //Выберем подходящие карты-не козыри (запретим компьютеру подкидывать козыри)
+                else{
+                    let availableCards = {'черви' :[],'буби' : [],'крести':[],'пики' : []};
+                    //добавим все возможные карты в массив availableCards
+                    for(let lear in this.state.fieldCards){
+                        for(let card of this.state.fieldCards[lear]){
+                            for(let lear2 in this.state.computerCards){
+                                for(let card2 of this.state.computerCards[lear2]){
+                                    if (card2 == card && lear2 != this.state.trump){
+                                        availableCards[lear2].push(card2);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    //если карты для подкидывания есть
+                    if( this.getLength(availableCards) != 0 ){
+
+                        //отсортируем их по возрастанию
+                        for(let lear in availableCards){
+                            availableCards[lear].sort((card1, card2) => {
+                                return  this.findIndex(card1) - this.findIndex(card2);
+                            });
+                        }
+
+                        //в этот массив добавим минимальную карту их каждой масти
+                        let minAvailableCards = [];
+                        for(let lear in availableCards){
+                            if((availableCards[lear]).length != 0)
+                                minAvailableCards.push([lear, availableCards[lear][0]]);
+                        }
+
+                        //отсортируем их по возрастанию
+                        minAvailableCards.sort((card1, card2) => {
+                            return  this.findIndex(card1[1]) - this.findIndex(card2[1]);
+                        });
+
+                        //теперь подходящая карта лежит в 0-м элементе массива
+                        lear = minAvailableCards[0][0];
+                        selectedCard = minAvailableCards[0][1];
+                    }
+                    else{
+                        console.log('У компьютера больше нет подходящих карт для подкидывания');
+                        this.setState({
+                            'info': 'Ваш ход',
+                            currentGamer : 'gamer'
+                        });
+                        this.takeCardsFromDeck();
+                        //удалить карты с игрового поля
+                        this.deleteCardsFromField();
+                        return false;
+                    }
+                }
+                this.state.currentComputerCard = {'lear' : lear, 'card' : selectedCard};
+                this.setState({currentComputerCard : this.state.currentComputerCard});
+                this.addCardToGameField(lear, selectedCard);
+                this.deleteCardFromComputer(lear, selectedCard);
+            }
+        }
+
+        //1. добавить карту в массив игрового поля
+        //2. удалить карту из массива карт игрока
+        makeGamerMove(event){
+            let target = event.target;
+            if(this.state.currentGamer == 'gamer'){
+
+
+                let cardIsOnField = false;
+                for(let lear in this.state.fieldCards){
+                    for(let card of this.state.fieldCards[lear]){
+                        if(card == target.dataset.card){
+                            cardIsOnField = true;
+                        }
+                    }
+                }
+
+                //Проверяем, что либо на поле нет карт, тогда можно ходить любой картой,
+                //Или что значение выбранной карты уже есть на поле(например, на поле есть 6-ки, тогда можно подкидывать
+                //6-ки)
+                if((this.getLength(this.state.fieldCards) == 0) || cardIsOnField){
+
+                    this.deleteCardFromGamer(target.dataset.lear, target.dataset.card);
+                    this.addCardToGameField(target.dataset.lear, target.dataset.card);
+
+                    this.isVictory();
+                    this.makeComputerMove(target.dataset.lear, target.dataset.card);
+
+                    console.log('gamerCards.length',this.getLength(this.state.gamerCards));
+
+                    //Если у игрока закончились карты -
+                    if(this.getLength(this.state.gamerCards) == 0){
+                        //добрать из колоды
+                        this.takeCardsFromDeck();
+                        //удалить карты с игрового поля
+                        this.deleteCardsFromField();
+                        //начать ход компьютера
+                    }
+                }
+            }
+
+            else if(this.state.currentGamer == 'computer'){
+                //проверить, что карта бьёт карту компьютера
+                console.log('gamerMove', this.state.currentComputerCard);
+                let computerCard = this.state.currentComputerCard;
+                let availableCard = false;
+                //если карта компьютера - не козырь
+                if( computerCard['lear'] != this.state.trump){
+                    //если карта игрока козырь либо карта игрока той же масти и больше
+                    if( (target.dataset.lear == this.state.trump) ||
+                        (target.dataset.lear == computerCard['lear']) &&
+                        this.findIndex(target.dataset.card) > this.findIndex(computerCard['card'])){
+                        availableCard = true;
+                    }
+                }
+                //Если карта компьютера - козырь
+                else{
+                    //если карта игрока той же масти и больше
+                    if((target.dataset.lear == computerCard['lear']) &&
+                        this.findIndex(target.dataset.card) > this.findIndex(computerCard['card'])){
+                        availableCard = true;
+                    }
+                }
+
+                if(availableCard){
+                    this.deleteCardFromGamer(target.dataset.lear, target.dataset.card);
+                    this.addCardToGameField(target.dataset.lear, target.dataset.card);
+                    this.isVictory();
+                    this.makeComputerMove();
+                }
+            }
+        }
+
+        deleteCardsFromField(){
+
+            this.state.fieldCards = {'черви' : [],
+                'буби' :  [],
+                'крести' :[],
+                'пики' :  []
+            };
+            this.setState({fieldCards : this.state.fieldCards});
+        }
+
+        nextMove(){
+            this.deleteCardsFromField();
+            this.takeCardsFromDeck();
+
+            this.state.currentGamer = 'computer';
+            this.setState({currentGamer : this.state.currentGamer,
+                info : 'Компьютер ходит под вас'
+            });
+            this.makeComputerMove(null, null);
+        }
+
+        //Обрабатывает ситуацию, когда игрок хочет взять карты с поля,
+        //потому что не хочет их крыть или ему нечем отбиться
+        takeCardsToGamer(){
+
+            this.takeCardsFromGameField('gamer');
+            this.takeCardsFromDeck();
+            this.isVictory();
+            this.makeComputerMove();
+        }
+
+        render(){
+            let gamerCards = this.prepareToRender(this.state.gamerCards);
+            let computerCards = this.prepareToRender(this.state.computerCards);
+
+            let deck = this.prepareToRender(this.state.deck);
+            let fieldCards = this.prepareToRender(this.state.fieldCards);
+
+            //Формируем массив с длиной, равной количеству карт у компьютера,
+            //чтобы нарисовать закрытые карты компьютера (рубашкой вверх)
+            let cardsArray = [];
+            for(let i = 0; i < this.getLength(this.state.computerCards); i++){
+                cardsArray.push(i);
+            }
+            let closedComputerCards = cardsArray.map((elem, index) => {
+                return <div key = {index} className = 'card'>
+                    <img  src = 'img/cardShirt.jpg'/>
+                </div>
+            });
+
+            return  <div id = 'parent'>
+                <h1>{this.state.info}</h1>
+
+                <input
+                    type = 'button'
+                    value = 'Новая игра'
+                    onClick = {this.startNewGame.bind(this)}
+                    disabled = {(this.state.gameOver) ? false : true }
+                />
+
+                <h2>Карты компьютера</h2>
+                <div id = 'computerCards'>
+                    {closedComputerCards}
+                </div>
+
+                <CurrentComputerCard
+                    currentGamer = {this.state.currentGamer}
+                    currentComputerCard = {this.state.currentComputerCard}
+                    makeGamerMove = {this.makeGamerMove}
+                />
+
+                <h2>Игровое поле</h2>
+                <div  id = 'fieldCards'>
+                    {fieldCards}
+                </div>
+
+                <h2>Козыри и колода</h2>
+                <div id = 'deck'>
+                    <div key = 'trumpCard' className = 'card'>
+                        <img  src = {'img/' + this.state.trumpCard + '_' + this.state.trump + '.jpg'}/>
+                    </div>
+                    <div key = 'deck' className = 'card'>
+                        <img  src = 'img/cardShirt.jpg'/>
+                    </div>
+                </div>
+
+                <h2>Ваши карты</h2>
+                <div id = 'gamerCards'>
+                    {gamerCards}
+                </div>
+                <input
+                    type = 'button'
+                    value = 'Следующий ход'
+                    onClick = {this.nextMove.bind(this)}
+                    disabled ={(this.state.currentGamer == 'gamer' &&
+                        this.getLength(this.state.fieldCards) != 0 &&
+                        !this.state.gameOver) ? false : true }
+                />
+
+                <input
+                    type = 'button'
+                    value = 'Взять карты'
+                    onClick = {this.takeCardsToGamer.bind(this)}
+                    disabled = {(this.state.currentGamer == 'computer' &&
+                        this.getLength(this.state.fieldCards) != 0 &&
+                        !this.state.gameOver) ? false : true }
+                />
+            </div>
+        }
+    }
+
+    //копонент для отрисовки карты, с которой атакует компьютер
+    class CurrentComputerCard extends React.Component
+    {
+        constructor(){
+            super();
+        }
+
+        render(){
+            if(this.props.currentGamer == 'computer')
+                return (
+                    <div>
+                        <h2>Компьютер ходит с карты</h2>
+                        <div id = 'fieldCards'>
+                            <div key = 'x' className = 'card'>
+
+                                <img data-lear = {this.props.currentComputerCard[0]}
+                                     data-card = {this.props.currentComputerCard[1]}
+                                     onClick = {this.props.makeGamerMove.bind(this)}
+                                     src = {'img/' + this.props.currentComputerCard['card'] +
+                                     '_' + this.props.currentComputerCard['lear'] + '.jpg'}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                );
+            else return <p></p>
+        }
+    }
+
+    ReactDOM.render(<App/>, document.getElementById('content'));
+</script>
+</body>
+</html>
